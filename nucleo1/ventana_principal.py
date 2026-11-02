@@ -190,10 +190,14 @@ class VentanaPrincipal:
         st.configure("Dark.Treeview.Heading", background=T["card2"], foreground=T["suave"],
                      relief="flat", font=(FUENTE, 9, "bold"), borderwidth=0)
         st.map("Dark.Treeview.Heading", background=[("active", T["card_sel"])])
-        st.configure("Dark.Vertical.TScrollbar", background=T["card2"], troughcolor=T["card"],
-                     bordercolor=T["card"], arrowcolor=T["suave"], lightcolor=T["card2"],
-                     darkcolor=T["card2"], relief="flat")
-        st.map("Dark.Vertical.TScrollbar", background=[("active", T["acento"])])
+        # Barra de desplazamiento bien visible: manija celeste clara sobre riel oscuro.
+        st.configure("Dark.Vertical.TScrollbar", background="#22d3ee", troughcolor="#080a1a",
+                     bordercolor="#080a1a", arrowcolor="#080a1a", lightcolor="#22d3ee",
+                     darkcolor="#22d3ee", relief="flat", gripcount=0, arrowsize=16, width=16)
+        st.map("Dark.Vertical.TScrollbar",
+               background=[("pressed", "#ffffff"), ("active", "#a5f3fc")],
+               lightcolor=[("pressed", "#ffffff"), ("active", "#a5f3fc")],
+               darkcolor=[("pressed", "#ffffff"), ("active", "#a5f3fc")])
         st.configure("Neon.Horizontal.TProgressbar", troughcolor=T["card"], background=T["acento2"],
                      bordercolor=T["panel"], lightcolor=T["acento2"], darkcolor=T["acento"], thickness=10)
         st.configure("Dark.TCombobox", fieldbackground=T["card2"], background=T["card2"],
@@ -352,8 +356,8 @@ class VentanaPrincipal:
         self.var_seleccionar_todos = tk.BooleanVar(value=False)
         tk.Checkbutton(
             fila_sel, text="Seleccionar todos", variable=self.var_seleccionar_todos,
-            bg=T["card"], fg=T["texto"], selectcolor=T["card2"], activebackground=T["card"],
-            activeforeground=T["texto"], font=(FUENTE, 9, "bold"), bd=0, highlightthickness=0,
+            bg=T["card"], fg="#22d3ee", selectcolor="#080a1a", activebackground=T["card"],
+            activeforeground="#22d3ee", font=(FUENTE, 9, "bold"), bd=0, highlightthickness=0,
             command=self._toggle_seleccionar_todos,
         ).pack(side="left")
         tk.Label(fila_sel, text="  Click: ver temas", bg=T["card"], fg=T["tenue"],
@@ -588,17 +592,18 @@ class VentanaPrincipal:
                 entry = {**item, "var": var}
                 fila = tk.Frame(self.frame_resultados, bg=T["card"], highlightthickness=1,
                                 highlightbackground=T["borde"])
-                fila.pack(fill="x", padx=8, pady=3)
+                fila.pack(fill="x", padx=8, pady=1)
                 tk.Checkbutton(
-                    fila, variable=var, bg=T["card"], selectcolor=T["card2"], activebackground=T["card"],
-                    bd=0, highlightthickness=0, command=self._actualizar_boton_descargar,
+                    fila, variable=var, bg=T["card"], fg="#22d3ee", selectcolor="#080a1a",
+                    activebackground=T["card"], activeforeground="#22d3ee",
+                    bd=0, highlightthickness=0, pady=0, command=self._actualizar_boton_descargar,
                 ).pack(side="left", padx=(4, 0))
                 texto = item["titulo"]
                 if item.get("cantidad"):
                     texto += f"  ({item['cantidad']} temas)"
                 lbl = tk.Label(
-                    fila, text=texto, bg=T["card"], fg=T["texto"], font=(FUENTE, 10), anchor="w",
-                    wraplength=330, justify="left", cursor="hand2", pady=8,
+                    fila, text=texto, bg=T["card"], fg=T["texto"], font=(FUENTE, 9), anchor="w",
+                    justify="left", cursor="hand2", pady=0,
                 )
                 lbl.pack(side="left", fill="x", expand=True)
                 entry["_fila"] = fila
@@ -617,6 +622,10 @@ class VentanaPrincipal:
         for item in self.albumes_encontrados:
             item["var"].set(marcado)
         self._actualizar_boton_descargar()
+        try:
+            self.ventana.update_idletasks()
+        except tk.TclError:
+            pass
 
     def _actualizar_boton_descargar(self):
         hay_seleccion = any(item["var"].get() for item in self.albumes_encontrados)
@@ -638,7 +647,7 @@ class VentanaPrincipal:
         item["_label"].config(bg=T["card_sel"])
         for hijo in item["_fila"].winfo_children():
             if isinstance(hijo, tk.Checkbutton):
-                hijo.config(bg=T["card_sel"], activebackground=T["card_sel"])
+                hijo.config(bg=T["card_sel"], activebackground=T["card_sel"], fg="#22d3ee")
         self._fila_resaltada = item["_fila"]
 
         self._gen_tracklist += 1

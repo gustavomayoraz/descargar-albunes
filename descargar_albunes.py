@@ -110,9 +110,44 @@ def _instalar_hooks():
         pass
 
 
+_SOCKET_UNICA = None
+
+
+def _ya_hay_otra_copia():
+    """True si ya hay otra copia del programa abierta (puerto local reservado)."""
+    global _SOCKET_UNICA
+    import socket
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setsockopt(socket.SOL_SOCKET, getattr(socket, "SO_EXCLUSIVEADDRUSE", socket.SO_REUSEADDR), 1)
+        sock.bind(("127.0.0.1", 47653))
+        sock.listen(1)
+        _SOCKET_UNICA = sock  # se mantiene vivo mientras corra el programa
+        return False
+    except OSError:
+        return True
+
+
 def main():
     _ocultar_consola_windows()
     _instalar_hooks()
+    if _ya_hay_otra_copia():
+        log.warning("Ya hay otra copia abierta: esta se cierra para no duplicar descargas.")
+        try:
+            import tkinter as tk
+            from tkinter import messagebox
+            raiz = tk.Tk()
+            raiz.withdraw()
+            raiz.attributes("-topmost", True)
+            messagebox.showwarning(
+                "Descargar Álbumes",
+                "El programa ya está abierto en otra ventana.\n\n"
+                "Usá esa ventana (si no la ves, cerrá el proceso pythonw desde el "
+                "Administrador de tareas y volvé a abrirlo).")
+            raiz.destroy()
+        except Exception:
+            pass
+        return
     log.info("=== Inicio de la aplicación (Python %s) ===", sys.version.split()[0])
 
     from ventana_dependencias import VentanaVerificacion

@@ -140,6 +140,20 @@ def formatear_nombre_tema(bpm, numero_tema, artista, nombre_tema, nombre_album, 
     return nombre
 
 
+def archivo_tema_existente(carpeta_album, numero_tema):
+    """Ruta del mp3 (no vacío) del tema con ese número, o None si no hay."""
+    patron = re.compile(rf"\)\. {int(numero_tema):02d}-")
+    try:
+        for nombre in sorted(os.listdir(carpeta_album)):
+            if nombre.lower().endswith(".mp3") and patron.search(nombre):
+                ruta = os.path.join(carpeta_album, nombre)
+                if os.path.getsize(ruta) > 100_000:
+                    return ruta
+    except OSError:
+        pass
+    return None
+
+
 def tema_ya_descargado(carpeta_album, numero_tema):
     """
     True si en la carpeta del álbum ya hay un mp3 (no vacío) del tema con ese
@@ -158,7 +172,7 @@ def tema_ya_descargado(carpeta_album, numero_tema):
 
 def ruta_descargas_base():
     # Un nivel arriba de nucleo1/ (la raíz del proyecto, donde vive descargar_albunes.py),
-    # para que "Desc_Albunes" quede al lado de descargar_albunes.py y no dentro de nucleo1/.
+    # para que "Desc_Albunes" quede al lado de main.py y no dentro de nucleo1/.
     raiz_proyecto = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     base = os.path.join(raiz_proyecto, "Desc_Albunes")
     os.makedirs(base, exist_ok=True)

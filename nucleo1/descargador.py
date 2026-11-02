@@ -20,6 +20,7 @@ import uuid
 
 import anti_bloqueo
 from utils import (
+    archivo_tema_existente,
     MAX_RUTA, formatear_nombre_tema, limpiar_titulo_tema, ruta_carpeta_album,
 )
 
@@ -254,6 +255,39 @@ def escribir_tags(ruta_mp3, titulo, artista, album, numero_tema, bpm):
         return False
 
 
+def _reservar_tema(carpeta_album, numero_tema, ruta_reserva, espera_max=1200):
+    """
+    Toma la reserva (archivo creado de forma atómica) para bajar este tema.
+    Devuelve None si la reserva quedó tomada por nosotros; o la ruta del mp3
+    si otra descarga lo terminó mientras esperábamos.
+    """
+    inicio = time.time()
+    while True:
+        try:
+            fd = os.open(ruta_reserva, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, str(os.getpid()).encode())
+            os.close(fd)
+            # Pudo terminar justo antes de que tomáramos la reserva.
+            ya = archivo_tema_existente(carpeta_album, numero_tema)
+            if ya:
+                try:
+                    os.remove(ruta_reserva)
+                except OSError:
+                    pass
+                return ya
+            return None
+        except FileExistsError:
+            try:
+                if time.time() - os.path.getmtime(ruta_reserva) > espera_max:
+                    os.remove(ruta_reserva)  # reserva vieja (programa cerrado a la fuerza)
+                    continue
+            except OSError:
+                continue
+            time.sleep(2)
+        except OSError:
+            return None  # si no se puede reservar, se sigue como antes
+
+
 def procesar_tema(url_video, artista, nombre_tema, numero_tema, nombre_album,
                   ffmpeg_path=None, duracion_esperada=None, on_etapa=None, arreglos=None, normalizar=True):
     """
@@ -278,6 +312,20 @@ def procesar_tema(url_video, artista, nombre_tema, numero_tema, nombre_album,
     base_tmp = os.path.join(carpeta_album, "_tmp")
     carpeta_temp = os.path.join(base_tmp, uuid.uuid4().hex[:8])
     os.makedirs(carpeta_temp, exist_ok=True)
+
+    # Reserva del tema: si otra descarga (otro hilo u otra copia del programa)
+    # ya está bajando este mismo número en esta carpeta, se espera a que termine
+    # y se usa su resultado en vez de bajarlo y guardarlo otra vez como " (1)".
+    ruta_reserva = os.path.join(carpeta_album, f".reserva_{int(numero_tema):02d}.lock")
+    existente = _reservar_tema(carpeta_album, numero_tema, ruta_reserva)
+    if existente:
+        shutil.rmtree(carpeta_temp, ignore_errors=True)
+        try:
+            os.rmdir(base_tmp)
+        except OSError:
+            pass
+        arreglos.append("otra descarga ya lo había bajado, se reutiliza")
+        return existente
 
     try:
         etapa("Descargando")
@@ -322,6 +370,13 @@ def procesar_tema(url_video, artista, nombre_tema, numero_tema, nombre_album,
         if completo != nombre_final:
             arreglos.append("nombre acortado (límite de ruta de Windows)")
 
+        # Último control antes de publicar: si ya apareció el mismo número de tema,
+        # no se crea un duplicado " (1)": se descarta esta copia.
+        ya = archivo_tema_existente(carpeta_album, numero_tema)
+        if ya:
+            arreglos.append("ya existía, no se duplica")
+            return ya
+
         ruta_candidata = os.path.join(carpeta_album, f"{nombre_final}.mp3")
         contador = 1
         while os.path.exists(ruta_candidata):
@@ -333,6 +388,10 @@ def procesar_tema(url_video, artista, nombre_tema, numero_tema, nombre_album,
         os.replace(ruta_descargada, ruta_candidata)
         return ruta_candidata
     finally:
+        try:
+            os.remove(ruta_reserva)
+        except OSError:
+            pass
         shutil.rmtree(carpeta_temp, ignore_errors=True)
         try:
             os.rmdir(base_tmp)  # solo si quedó vacía
